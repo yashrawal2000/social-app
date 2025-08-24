@@ -1,0 +1,50 @@
+
+name: my_app
+description: Production-ready Flutter app with i18n, secure storage, and robust error handling.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  provider: ^6.1.2
+
+  # Localization
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.19.0
+
+  # Networking & connectivity
+  http: ^1.2.2
+  connectivity_plus: ^6.0.3
+
+  # Caching
+  cached_network_image: ^3.3.1
+
+  # Secure storage
+  flutter_secure_storage: ^9.2.2
+
+  # Crash reporting (optional - wire up per platform)
+  firebase_core: ^3.5.0
+  firebase_crashlytics: ^3.4.6
+  firebase_analytics: ^10.10.6
+  firebase_messaging: ^15.1.2
+
+  # (Optional) Sentry - comment out if not used
+  sentry_flutter: ^8.7.0
+
+  # Routing (simple but powerful)
+  go_router: ^14.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
