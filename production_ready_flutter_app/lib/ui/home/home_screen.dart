@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../shared/locale_selector.dart';
+import 'security_dashboard.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -20,6 +21,8 @@ class HomeScreen extends StatelessWidget {
             Text(loc.welcomeUser('Manish')),
             const SizedBox(height: 16),
             Text(loc.unreadMessages(5)),
+            const SizedBox(height: 24),
+            const SecurityDashboard(),
             const SizedBox(height: 24),
             const LocaleSelector(),
           ],
