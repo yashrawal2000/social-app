@@ -13,6 +13,8 @@ class OverviewTab extends StatelessWidget {
     required this.onRiskProfileChanged,
     required this.targetReturn,
     required this.selectedRiskProfile,
+    this.optimization,
+    this.macroIndicators = const [],
   });
 
   final PortfolioSnapshot snapshot;
@@ -22,6 +24,8 @@ class OverviewTab extends StatelessWidget {
   final ValueChanged<RiskProfile> onRiskProfileChanged;
   final double targetReturn;
   final RiskProfile selectedRiskProfile;
+  final PortfolioOptimization? optimization;
+  final List<MacroIndicator> macroIndicators;
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +122,13 @@ class OverviewTab extends StatelessWidget {
                 child: _buildRiskMetrics(theme),
               ),
               const SizedBox(height: 8),
+              if (optimization != null)
+                SectionCard(
+                  title: 'Deterministic Portfolio Optimization',
+                  subtitle: 'Precise allocations matching target return with guardrails satisfied',
+                  child: _buildOptimization(theme, optimization!),
+                ),
+              if (optimization != null) const SizedBox(height: 8),
               SectionCard(
                 title: 'What-if Simulations',
                 subtitle: 'Explore strategy paths with explainable Monte Carlo ensembles',
@@ -153,6 +164,13 @@ class OverviewTab extends StatelessWidget {
                 child: _buildSimulations(theme),
               ),
               const SizedBox(height: 8),
+              if (macroIndicators.isNotEmpty)
+                SectionCard(
+                  title: 'Macro Intelligence Matrix',
+                  subtitle: 'Cross-asset signals calibrated from the global data fabric',
+                  child: _buildMacroIndicators(theme),
+                ),
+              if (macroIndicators.isNotEmpty) const SizedBox(height: 8),
               SectionCard(
                 title: 'Market Intelligence',
                 subtitle: 'Streaming macro, alternative data, and sentiment narratives',
@@ -181,6 +199,138 @@ class OverviewTab extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildOptimization(ThemeData theme, PortfolioOptimization optimization) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: [
+            _MetricTile(
+              title: 'Expected return',
+              value: '${(optimization.expectedReturn * 100).toStringAsFixed(2)}%',
+              trend: 'Target ${(optimization.targetReturn * 100).toStringAsFixed(1)}%',
+              icon: Icons.trending_up,
+              color: theme.colorScheme.primary,
+            ),
+            _MetricTile(
+              title: 'Expected risk',
+              value: '${(optimization.expectedRisk * 100).toStringAsFixed(2)}%',
+              trend: 'Sharpe ${(optimization.sharpe).toStringAsFixed(2)}',
+              icon: Icons.stacked_line_chart,
+              color: theme.colorScheme.secondary,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text('Execution playbook', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ...optimization.instructions.map(
+          (instruction) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Icon(Icons.task_alt, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(child: Text(instruction)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('Constraints satisfied', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ...optimization.constraintsRespected.map(
+          (constraint) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Icon(Icons.verified_user, color: theme.colorScheme.secondary),
+                const SizedBox(width: 12),
+                Expanded(child: Text(constraint)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('Allocation adjustments', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ...optimization.allocations.map(
+          (allocation) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                CircleAvatar(child: Text(allocation.asset.symbol.substring(0, 2))),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(allocation.asset.name, style: theme.textTheme.titleMedium),
+                      Text(
+                        'Current ${(allocation.currentAllocation * 100).toStringAsFixed(1)}% → Target ${(allocation.recommendedAllocation * 100).toStringAsFixed(1)}%',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      Text(allocation.action),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  allocation.delta >= 0
+                      ? '+${(allocation.delta * 100).toStringAsFixed(1)}%'
+                      : '${(allocation.delta * 100).toStringAsFixed(1)}%',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMacroIndicators(ThemeData theme) {
+    return Column(
+      children: macroIndicators
+          .map(
+            (indicator) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.public, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(indicator.name, style: theme.textTheme.titleMedium),
+                        Text(
+                          'Value ${indicator.currentValue.toStringAsFixed(1)} (${indicator.change >= 0 ? '+' : ''}${indicator.change.toStringAsFixed(1)})',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(indicator.trendDescription),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('Confidence ${(indicator.confidence * 100).toStringAsFixed(0)}%'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 

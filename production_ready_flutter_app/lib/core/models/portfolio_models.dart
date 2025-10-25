@@ -112,6 +112,33 @@ class ForecastInsight {
 }
 
 @immutable
+class PrecisionForecast {
+  const PrecisionForecast({
+    required this.asset,
+    required this.currentPrice,
+    required this.projectedPrice,
+    required this.horizon,
+    required this.expectedError,
+    required this.confidence,
+    required this.rationales,
+    required this.modelStack,
+  });
+
+  final PortfolioAsset asset;
+  final double currentPrice;
+  final double projectedPrice;
+  final DateTime horizon;
+  final double expectedError;
+  final double confidence;
+  final List<String> rationales;
+  final String modelStack;
+
+  double get absoluteDelta => projectedPrice - currentPrice;
+
+  double get relativeDelta => currentPrice == 0 ? 0 : absoluteDelta / currentPrice;
+}
+
+@immutable
 class RiskMetrics {
   const RiskMetrics({
     required this.valueAtRisk,
@@ -162,6 +189,23 @@ class SimulationScenario {
   final double expectedVolatility;
   final double tailRisk;
   final double probability;
+}
+
+@immutable
+class MacroIndicator {
+  const MacroIndicator({
+    required this.name,
+    required this.currentValue,
+    required this.change,
+    required this.trendDescription,
+    required this.confidence,
+  });
+
+  final String name;
+  final double currentValue;
+  final double change;
+  final String trendDescription;
+  final double confidence;
 }
 
 @immutable
@@ -226,6 +270,91 @@ class AutomationIntegration {
       apiLatencyMs: apiLatencyMs ?? this.apiLatencyMs,
     );
   }
+}
+
+@immutable
+class OptimizationAllocation {
+  const OptimizationAllocation({
+    required this.asset,
+    required this.currentAllocation,
+    required this.recommendedAllocation,
+    required this.action,
+  });
+
+  final PortfolioAsset asset;
+  final double currentAllocation;
+  final double recommendedAllocation;
+  final String action;
+
+  double get delta => recommendedAllocation - currentAllocation;
+}
+
+@immutable
+class PortfolioOptimization {
+  const PortfolioOptimization({
+    required this.targetReturn,
+    required this.expectedReturn,
+    required this.expectedRisk,
+    required this.sharpe,
+    required this.instructions,
+    required this.constraintsRespected,
+    required this.allocations,
+  });
+
+  final double targetReturn;
+  final double expectedReturn;
+  final double expectedRisk;
+  final double sharpe;
+  final List<String> instructions;
+  final List<String> constraintsRespected;
+  final List<OptimizationAllocation> allocations;
+}
+
+@immutable
+class TaxOptimizationOpportunity {
+  const TaxOptimizationOpportunity({
+    required this.asset,
+    required this.harvestAmount,
+    required this.estimatedBenefit,
+    required this.deadline,
+    required this.action,
+  });
+
+  final PortfolioAsset asset;
+  final double harvestAmount;
+  final double estimatedBenefit;
+  final DateTime deadline;
+  final String action;
+}
+
+@immutable
+class CashFlowPoint {
+  const CashFlowPoint({
+    required this.month,
+    required this.inflows,
+    required this.outflows,
+  });
+
+  final DateTime month;
+  final double inflows;
+  final double outflows;
+
+  double get net => inflows - outflows;
+}
+
+@immutable
+class CashFlowProjection {
+  const CashFlowProjection({
+    required this.points,
+    required this.averageSurplus,
+    required this.coverageRatio,
+    required this.commentary,
+  });
+
+  final List<CashFlowPoint> points;
+  final double averageSurplus;
+  final double coverageRatio;
+  final String commentary;
 }
 
 enum AssistantRole { user, assistant, system }

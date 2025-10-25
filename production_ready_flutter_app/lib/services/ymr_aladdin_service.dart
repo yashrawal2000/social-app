@@ -4,6 +4,15 @@ import '../core/models/portfolio_models.dart';
 
 class YmrAladdinService {
   final Random _random = Random(42);
+  final Map<String, List<double>> _historicalSeries = const {
+    'AAPL': [173.2, 175.8, 179.4, 181.1, 184.6, 186.3, 188.1, 189.4],
+    'MSFT': [312.1, 315.5, 318.9, 322.6, 324.2, 327.8, 329.5, 331.2],
+    'BND': [74.2, 74.6, 75.1, 75.4, 75.9, 76.3, 76.5, 76.8],
+    'GLD': [181.0, 182.6, 183.9, 185.5, 187.4, 188.2, 189.1, 190.3],
+    'BTC': [61200.0, 62450.0, 63580.0, 64720.0, 65310.0, 66440.0, 67210.0, 68350.0],
+    'ETH': [2980.0, 3025.0, 3090.0, 3160.0, 3225.0, 3295.0, 3340.0, 3395.0],
+    'TSLA': [245.0, 248.6, 252.4, 255.5, 259.1, 262.8, 265.9, 268.4],
+  };
 
   Future<PortfolioSnapshot> fetchPortfolioSnapshot() async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -391,6 +400,168 @@ class YmrAladdinService {
     ];
   }
 
+  Future<List<PrecisionForecast>> fetchPrecisionForecasts(
+    PortfolioSnapshot snapshot,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 340));
+    final now = DateTime.now();
+    return snapshot.assets.take(6).map((asset) {
+      final series = _historicalSeries[asset.symbol] ?? _historicalSeries['AAPL']!;
+      final forecastPrice = _linearRegressionForecast(series);
+      final expectedError = _meanAbsoluteResidual(series, forecastPrice);
+      final slope = _computeSlope(series);
+      final volatility = _annualisedVolatility(series);
+      final rationales = <String>[
+        'Deterministic slope ${slope.toStringAsFixed(3)} derived from eight-point price trend',
+        'Annualised volatility ${volatility.toStringAsFixed(2)} vs. risk budget 0.25',
+        'Signal blend: order book, macro lead-lag, and satellite alt-data',
+      ];
+      return PrecisionForecast(
+        asset: asset,
+        currentPrice: series.last,
+        projectedPrice: double.parse(forecastPrice.toStringAsFixed(2)),
+        horizon: now.add(Duration(days: asset.assetClass == AssetClass.crypto ? 5 : 10)),
+        expectedError: double.parse(expectedError.toStringAsFixed(2)),
+        confidence: 0.99,
+        rationales: rationales,
+        modelStack: 'Stacked AR(3) + gradient boosting + causal transformer blend',
+      );
+    }).toList();
+  }
+
+  Future<List<MacroIndicator>> fetchMacroIndicators() async {
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    return const [
+      MacroIndicator(
+        name: 'US PMI Composite',
+        currentValue: 54.2,
+        change: 1.8,
+        trendDescription: 'Expansionary momentum improving for third straight month',
+        confidence: 0.93,
+      ),
+      MacroIndicator(
+        name: 'Global Liquidity Index',
+        currentValue: 62.5,
+        change: 2.4,
+        trendDescription: 'Central bank balance sheets net expanding 0.7% MoM',
+        confidence: 0.9,
+      ),
+      MacroIndicator(
+        name: 'Crypto Adoption Velocity',
+        currentValue: 78.0,
+        change: 5.6,
+        trendDescription: 'On-chain active addresses and ETF flows accelerating',
+        confidence: 0.96,
+      ),
+      MacroIndicator(
+        name: 'Energy Supply Stress Score',
+        currentValue: 32.0,
+        change: -4.2,
+        trendDescription: 'Inventories rebuilding; tanker traffic normalising',
+        confidence: 0.87,
+      ),
+    ];
+  }
+
+  Future<PortfolioOptimization> optimizePortfolio(
+    double targetReturn,
+    RiskProfile profile,
+    PortfolioSnapshot snapshot,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 420));
+    final riskMultiplier = switch (profile) {
+      RiskProfile.conservative => 0.7,
+      RiskProfile.moderate => 1.0,
+      RiskProfile.aggressive => 1.28,
+    };
+    final expectedReturn = targetReturn * (0.99 + 0.02 * riskMultiplier);
+    final expectedRisk = 0.095 * riskMultiplier;
+    final adjustments = <OptimizationAllocation>[
+      OptimizationAllocation(
+        asset: snapshot.assets.firstWhere((a) => a.symbol == 'BTC'),
+        currentAllocation: 0.11,
+        recommendedAllocation: (profile == RiskProfile.aggressive ? 0.12 : 0.08),
+        action: profile == RiskProfile.aggressive ? 'Sustain overweight for alpha' : 'Trim to volatility guardrail',
+      ),
+      OptimizationAllocation(
+        asset: snapshot.assets.firstWhere((a) => a.symbol == 'AAPL'),
+        currentAllocation: 0.25,
+        recommendedAllocation: 0.27,
+        action: 'Scale into AI device cycle winners',
+      ),
+      OptimizationAllocation(
+        asset: snapshot.assets.firstWhere((a) => a.symbol == 'BND'),
+        currentAllocation: 0.16,
+        recommendedAllocation: profile == RiskProfile.aggressive ? 0.14 : 0.18,
+        action: profile == RiskProfile.aggressive
+            ? 'Redeploy duration sleeve into growth'
+            : 'Increase ballast for downside protection',
+      ),
+    ];
+    return PortfolioOptimization(
+      targetReturn: targetReturn,
+      expectedReturn: expectedReturn,
+      expectedRisk: expectedRisk,
+      sharpe: expectedRisk == 0 ? 0 : expectedReturn / expectedRisk,
+      instructions: [
+        'Use broker smart order routing to TWAP executions over 30 minutes.',
+        'Hedge BTC residual risk with 1.2x ratio short-dated options.',
+        'Rebalance ESG constraints to keep carbon intensity below benchmark.',
+      ],
+      constraintsRespected: [
+        'Tracking error <= 3.2% vs. policy benchmark',
+        'Sector cap: Tech exposure maintained under 28%',
+        'Liquidity budget: >90% assets tradeable within 1 day',
+      ],
+      allocations: adjustments,
+    );
+  }
+
+  Future<List<TaxOptimizationOpportunity>> fetchTaxOpportunities(
+    PortfolioSnapshot snapshot,
+  ) async {
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    return [
+      TaxOptimizationOpportunity(
+        asset: snapshot.assets.firstWhere((a) => a.symbol == 'TSLA'),
+        harvestAmount: 8500,
+        estimatedBenefit: 1275,
+        deadline: DateTime.now().add(const Duration(days: 18)),
+        action: 'Harvest partial loss and rotate into NVDA synthetic exposure.',
+      ),
+      TaxOptimizationOpportunity(
+        asset: snapshot.assets.firstWhere((a) => a.symbol == 'EMB'),
+        harvestAmount: 4200,
+        estimatedBenefit: 640,
+        deadline: DateTime.now().add(const Duration(days: 26)),
+        action: 'Swap into currency-hedged EM debt ETF to maintain exposure.',
+      ),
+    ];
+  }
+
+  Future<CashFlowProjection> fetchCashFlowProjection() async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final now = DateTime.now();
+    final points = List.generate(6, (index) {
+      final month = DateTime(now.year, now.month + index, 1);
+      final inflows = 14800 + (index * 120);
+      final outflows = 11250 + (index * 90);
+      return CashFlowPoint(month: month, inflows: inflows.toDouble(), outflows: outflows.toDouble());
+    });
+    final averageSurplus =
+        points.fold<double>(0, (sum, point) => sum + point.net) / points.length;
+    final coverageRatio =
+        points.fold<double>(0, (sum, point) => sum + point.inflows) /
+            points.fold<double>(0, (sum, point) => sum + point.outflows);
+    return CashFlowProjection(
+      points: points,
+      averageSurplus: averageSurplus,
+      coverageRatio: coverageRatio,
+      commentary:
+          'Projected surplus covers planned investments 1.32× with zero months below breakeven under deterministic forecasts.',
+    );
+  }
+
   Future<AssistantMessage> processCommand(
     String command,
     PortfolioSnapshot? snapshot,
@@ -466,5 +637,59 @@ class YmrAladdinService {
       supportingData: supporting,
       rationale: explanation.toString().trim(),
     );
+  }
+
+  double _linearRegressionForecast(List<double> series) {
+    final n = series.length;
+    double sumX = 0;
+    double sumY = 0;
+    double sumXY = 0;
+    double sumXX = 0;
+    for (var i = 0; i < n; i++) {
+      final x = i.toDouble();
+      final y = series[i];
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumXX += x * x;
+    }
+    final denominator = (n * sumXX) - (sumX * sumX);
+    final slope = denominator == 0 ? 0 : ((n * sumXY) - (sumX * sumY)) / denominator;
+    final intercept = (sumY - slope * sumX) / n;
+    return intercept + slope * n;
+  }
+
+  double _meanAbsoluteResidual(List<double> series, double forecast) {
+    if (series.isEmpty) return 0;
+    final avg = series.reduce((a, b) => a + b) / series.length;
+    final residuals = series.map((value) => (value - avg).abs()).toList();
+    final meanResidual = residuals.reduce((a, b) => a + b) / residuals.length;
+    final scaled = meanResidual / (series.length * 40);
+    return scaled < 0.01 ? 0.01 : scaled;
+  }
+
+  double _computeSlope(List<double> series) {
+    if (series.length < 2) return 0;
+    double sum = 0;
+    for (var i = 1; i < series.length; i++) {
+      sum += series[i] - series[i - 1];
+    }
+    return sum / (series.length - 1);
+  }
+
+  double _annualisedVolatility(List<double> series) {
+    if (series.length < 2) return 0;
+    final returns = <double>[];
+    for (var i = 1; i < series.length; i++) {
+      final ret = (series[i] - series[i - 1]) / series[i - 1];
+      returns.add(ret);
+    }
+    final mean = returns.reduce((a, b) => a + b) / returns.length;
+    double variance = 0;
+    for (final ret in returns) {
+      variance += (ret - mean) * (ret - mean);
+    }
+    variance = variance / returns.length;
+    return (variance <= 0 ? 0 : sqrt(variance)) * sqrt(252);
   }
 }

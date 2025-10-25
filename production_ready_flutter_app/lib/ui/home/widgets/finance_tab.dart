@@ -8,10 +8,14 @@ class FinanceTab extends StatelessWidget {
     super.key,
     required this.goals,
     required this.budget,
+    this.taxOpportunities = const [],
+    this.cashFlowProjection,
   });
 
   final List<PersonalFinanceGoal> goals;
   final List<BudgetCategory> budget;
+  final List<TaxOptimizationOpportunity> taxOpportunities;
+  final CashFlowProjection? cashFlowProjection;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +38,27 @@ class FinanceTab extends StatelessWidget {
                   .toList(),
             ),
           ),
+          if (taxOpportunities.isNotEmpty)
+            SectionCard(
+              title: 'Tax Optimisation Radar',
+              subtitle: 'Exact harvesting opportunities with estimated benefits and execution guidance',
+              child: Column(
+                children: taxOpportunities
+                    .map(
+                      (opportunity) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: _TaxOpportunityTile(opportunity: opportunity),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          if (cashFlowProjection != null)
+            SectionCard(
+              title: 'Cash Flow Projection',
+              subtitle: 'Six-month deterministic surplus model covering planned investments',
+              child: _CashFlowView(projection: cashFlowProjection!),
+            ),
           SectionCard(
             title: 'Budget Pulse',
             subtitle: 'Monthly budgets with sentiment and anomaly detection',
@@ -155,4 +180,116 @@ class _GoalTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TaxOpportunityTile extends StatelessWidget {
+  const _TaxOpportunityTile({required this.opportunity});
+
+  final TaxOptimizationOpportunity opportunity;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.errorContainer.withOpacity(0.25),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(child: Text(opportunity.asset.symbol.substring(0, 2))),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${opportunity.asset.name}', style: theme.textTheme.titleMedium),
+                    Text(
+                      'Harvest ${opportunity.harvestAmount.toStringAsFixed(0)} · Benefit ${opportunity.estimatedBenefit.toStringAsFixed(0)} · Deadline ${_formatDate(opportunity.deadline)}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(opportunity.action),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
+}
+
+class _CashFlowView extends StatelessWidget {
+  const _CashFlowView({required this.projection});
+
+  final CashFlowProjection projection;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 16,
+          children: [
+            Chip(
+              avatar: const Icon(Icons.savings, size: 16),
+              label: Text('Avg surplus ${projection.averageSurplus.toStringAsFixed(0)}'),
+            ),
+            Chip(
+              avatar: const Icon(Icons.security, size: 16),
+              label: Text('Coverage ${(projection.coverageRatio).toStringAsFixed(2)}×'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(projection.commentary, style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 12),
+        Column(
+          children: projection.points
+              .map(
+                (point) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_monthLabel(point.month)}',
+                          style: theme.textTheme.titleSmall,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text('Inflows ${point.inflows.toStringAsFixed(0)}'),
+                      ),
+                      Expanded(
+                        child: Text('Outflows ${point.outflows.toStringAsFixed(0)}'),
+                      ),
+                      Chip(
+                        avatar: Icon(
+                          point.net >= 0 ? Icons.trending_up : Icons.warning_amber,
+                          size: 16,
+                          color: point.net >= 0 ? theme.colorScheme.primary : theme.colorScheme.error,
+                        ),
+                        label: Text('${point.net >= 0 ? '+' : ''}${point.net.toStringAsFixed(0)}'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  String _monthLabel(DateTime month) => '${month.month}/${month.year}';
 }

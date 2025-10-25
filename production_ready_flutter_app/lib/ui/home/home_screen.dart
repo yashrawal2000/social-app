@@ -97,11 +97,14 @@ class _HomeScreenState extends State<HomeScreen> {
           onRiskProfileChanged: (profile) => provider.runWhatIf(profile: profile),
           targetReturn: provider.targetReturn,
           selectedRiskProfile: provider.selectedRiskProfile,
+          optimization: provider.optimization,
+          macroIndicators: provider.macroIndicators,
         );
       case 1:
         return ForecastTab(
           forecasts: provider.forecasts,
           tradeIdeas: provider.tradeIdeas,
+          precisionForecasts: provider.precisionForecasts,
         );
       case 2:
         return AssistantTab(
@@ -113,6 +116,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return FinanceTab(
           goals: provider.goals,
           budget: provider.budget,
+          taxOpportunities: provider.taxOpportunities,
+          cashFlowProjection: provider.cashFlowProjection,
         );
       case 4:
         return AutomationTab(

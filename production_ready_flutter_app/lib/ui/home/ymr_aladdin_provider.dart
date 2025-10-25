@@ -16,11 +16,16 @@ class YmrAladdinProvider extends ChangeNotifier {
   PortfolioSnapshot? _snapshot;
   RiskMetrics? _riskMetrics;
   List<ForecastInsight> _forecasts = const [];
+  List<PrecisionForecast> _precisionForecasts = const [];
   List<SimulationScenario> _simulations = const [];
   List<PersonalFinanceGoal> _goals = const [];
   List<BudgetCategory> _budget = const [];
+  List<MacroIndicator> _macroIndicators = const [];
   List<AutomationIntegration> _integrations = const [];
   List<TradeIdea> _tradeIdeas = const [];
+  PortfolioOptimization? _optimization;
+  List<TaxOptimizationOpportunity> _taxOpportunities = const [];
+  CashFlowProjection? _cashFlowProjection;
   final List<AssistantMessage> _conversation = [
     const AssistantMessage(
       role: AssistantRole.assistant,
@@ -44,11 +49,16 @@ class YmrAladdinProvider extends ChangeNotifier {
   PortfolioSnapshot? get snapshot => _snapshot;
   RiskMetrics? get riskMetrics => _riskMetrics;
   List<ForecastInsight> get forecasts => _forecasts;
+  List<PrecisionForecast> get precisionForecasts => _precisionForecasts;
   List<SimulationScenario> get simulations => _simulations;
   List<PersonalFinanceGoal> get goals => _goals;
   List<BudgetCategory> get budget => _budget;
+  List<MacroIndicator> get macroIndicators => _macroIndicators;
   List<AutomationIntegration> get integrations => _integrations;
   List<TradeIdea> get tradeIdeas => _tradeIdeas;
+  PortfolioOptimization? get optimization => _optimization;
+  List<TaxOptimizationOpportunity> get taxOpportunities => _taxOpportunities;
+  CashFlowProjection? get cashFlowProjection => _cashFlowProjection;
   List<AssistantMessage> get conversation => List.unmodifiable(_conversation);
   double get targetReturn => _targetReturn;
   RiskProfile get selectedRiskProfile => _selectedRiskProfile;
@@ -67,8 +77,10 @@ class YmrAladdinProvider extends ChangeNotifier {
       final snapshot = await _service.fetchPortfolioSnapshot();
       final risk = await _service.fetchRiskMetrics();
       final forecasts = await _service.fetchForecasts(snapshot);
+      final precisionForecasts = await _service.fetchPrecisionForecasts(snapshot);
       final goals = await _service.fetchGoals();
       final budget = await _service.fetchBudget();
+      final macro = await _service.fetchMacroIndicators();
       final integrations = await _service.fetchIntegrations();
       final ideas = await _service.fetchTradeIdeas(snapshot);
       final simulations = await _service.runSimulations(
@@ -76,15 +88,27 @@ class YmrAladdinProvider extends ChangeNotifier {
         _selectedRiskProfile,
         snapshot,
       );
+      final optimization = await _service.optimizePortfolio(
+        _targetReturn,
+        _selectedRiskProfile,
+        snapshot,
+      );
+      final taxOps = await _service.fetchTaxOpportunities(snapshot);
+      final cashFlow = await _service.fetchCashFlowProjection();
 
       _snapshot = snapshot;
       _riskMetrics = risk;
       _forecasts = forecasts;
+      _precisionForecasts = precisionForecasts;
       _goals = goals;
       _budget = budget;
+      _macroIndicators = macro;
       _integrations = integrations;
       _tradeIdeas = ideas;
       _simulations = simulations;
+      _optimization = optimization;
+      _taxOpportunities = taxOps;
+      _cashFlowProjection = cashFlow;
     } catch (error, stack) {
       debugPrint('Failed to initialize dashboard: $error\n$stack');
       _error = 'Unable to load data. Please check your connection and retry.';
@@ -116,6 +140,11 @@ class YmrAladdinProvider extends ChangeNotifier {
       _snapshot!,
     );
     _simulations = sims;
+    _optimization = await _service.optimizePortfolio(
+      _targetReturn,
+      _selectedRiskProfile,
+      _snapshot!,
+    );
     notifyListeners();
   }
 

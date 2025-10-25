@@ -8,10 +8,12 @@ class ForecastTab extends StatelessWidget {
     super.key,
     required this.forecasts,
     required this.tradeIdeas,
+    this.precisionForecasts = const [],
   });
 
   final List<ForecastInsight> forecasts;
   final List<TradeIdea> tradeIdeas;
+  final List<PrecisionForecast> precisionForecasts;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +37,21 @@ class ForecastTab extends StatelessWidget {
                   .toList(),
             ),
           ),
+          if (precisionForecasts.isNotEmpty)
+            SectionCard(
+              title: 'Deterministic Price Targets',
+              subtitle: 'Exact path projections calibrated from stacked models with explainable drivers',
+              child: Column(
+                children: precisionForecasts
+                    .map(
+                      (forecast) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: _PrecisionTile(forecast: forecast),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
           SectionCard(
             title: 'Explainable Recommendations',
             subtitle: 'Every action links to data drivers and model confidence',
@@ -197,6 +214,84 @@ class _ForecastRow extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _PrecisionTile extends StatelessWidget {
+  const _PrecisionTile({required this.forecast});
+
+  final PrecisionForecast forecast;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.primaryContainer.withOpacity(0.4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(child: Text(forecast.asset.symbol.substring(0, 2))),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(forecast.asset.name, style: theme.textTheme.titleMedium),
+                    Text(
+                      'Now ${forecast.currentPrice.toStringAsFixed(2)} → Target ${forecast.projectedPrice.toStringAsFixed(2)} by ${_formatDate(forecast.horizon)}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        Chip(
+                          avatar: const Icon(Icons.trending_up, size: 16),
+                          label: Text('${(forecast.relativeDelta * 100).toStringAsFixed(2)}% delta'),
+                        ),
+                        Chip(
+                          avatar: const Icon(Icons.rule, size: 16),
+                          label: Text('Error ±${forecast.expectedError.toStringAsFixed(2)}'),
+                        ),
+                        Chip(
+                          avatar: const Icon(Icons.shield_outlined, size: 16),
+                          label: Text('Confidence ${(forecast.confidence * 100).toStringAsFixed(0)}%'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('Model stack: ${forecast.modelStack}', style: theme.textTheme.bodySmall),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: forecast.rationales
+                .map(
+                  (rationale) => Chip(
+                    avatar: const Icon(Icons.fact_check, size: 16),
+                    label: Text(rationale),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 }
 
