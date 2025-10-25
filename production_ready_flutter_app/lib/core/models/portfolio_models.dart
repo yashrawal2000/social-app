@@ -398,3 +398,48 @@ class TradeIdea {
   final List<String> supportingEvidence;
   final double confidence;
 }
+
+@immutable
+class ResearchInsight {
+  const ResearchInsight({
+    required this.title,
+    required this.summary,
+    required this.supportingSources,
+    required this.confidence,
+  });
+
+  final String title;
+  final String summary;
+  final List<String> supportingSources;
+  final double confidence;
+}
+
+@immutable
+class StrategyPlaybook {
+  const StrategyPlaybook({
+    required this.name,
+    required this.objective,
+    required this.expectedReturn,
+    required this.riskBudget,
+    required this.tactics,
+  });
+
+  final String name;
+  final String objective;
+  final double expectedReturn;
+  final double riskBudget;
+  final List<String> tactics;
+}
+
+@immutable
+class PlatformCapability {
+  const PlatformCapability({
+    required this.platform,
+    required this.status,
+    required this.notes,
+  });
+
+  final String platform;
+  final String status;
+  final String notes;
+}

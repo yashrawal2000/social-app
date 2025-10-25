@@ -15,6 +15,7 @@ class OverviewTab extends StatelessWidget {
     required this.selectedRiskProfile,
     this.optimization,
     this.macroIndicators = const [],
+    this.platformCapabilities = const [],
   });
 
   final PortfolioSnapshot snapshot;
@@ -26,6 +27,7 @@ class OverviewTab extends StatelessWidget {
   final RiskProfile selectedRiskProfile;
   final PortfolioOptimization? optimization;
   final List<MacroIndicator> macroIndicators;
+  final List<PlatformCapability> platformCapabilities;
 
   @override
   Widget build(BuildContext context) {
@@ -163,6 +165,50 @@ class OverviewTab extends StatelessWidget {
                 ),
                 child: _buildSimulations(theme),
               ),
+              if (platformCapabilities.isNotEmpty) const SizedBox(height: 8),
+              if (platformCapabilities.isNotEmpty)
+                SectionCard(
+                  title: 'Cross-platform Delivery',
+                  subtitle: 'Mobile, web, and Windows builds share the same secure intelligence core',
+                  child: Column(
+                    children: platformCapabilities
+                        .map(
+                          (capability) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  capability.status.toLowerCase().contains('ready')
+                                      ? Icons.check_circle_outline
+                                      : Icons.devices_other,
+                                  color: theme.colorScheme.primary,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(capability.platform, style: theme.textTheme.titleMedium),
+                                      Text(
+                                        capability.status,
+                                        style: theme.textTheme.labelMedium,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        capability.notes,
+                                        style: theme.textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
               const SizedBox(height: 8),
               if (macroIndicators.isNotEmpty)
                 SectionCard(

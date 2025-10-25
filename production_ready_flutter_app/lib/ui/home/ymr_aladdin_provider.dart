@@ -26,6 +26,9 @@ class YmrAladdinProvider extends ChangeNotifier {
   PortfolioOptimization? _optimization;
   List<TaxOptimizationOpportunity> _taxOpportunities = const [];
   CashFlowProjection? _cashFlowProjection;
+  List<ResearchInsight> _researchInsights = const [];
+  List<StrategyPlaybook> _strategyPlaybooks = const [];
+  List<PlatformCapability> _platformCapabilities = const [];
   final List<AssistantMessage> _conversation = [
     const AssistantMessage(
       role: AssistantRole.assistant,
@@ -59,6 +62,9 @@ class YmrAladdinProvider extends ChangeNotifier {
   PortfolioOptimization? get optimization => _optimization;
   List<TaxOptimizationOpportunity> get taxOpportunities => _taxOpportunities;
   CashFlowProjection? get cashFlowProjection => _cashFlowProjection;
+  List<ResearchInsight> get researchInsights => _researchInsights;
+  List<StrategyPlaybook> get strategyPlaybooks => _strategyPlaybooks;
+  List<PlatformCapability> get platformCapabilities => _platformCapabilities;
   List<AssistantMessage> get conversation => List.unmodifiable(_conversation);
   double get targetReturn => _targetReturn;
   RiskProfile get selectedRiskProfile => _selectedRiskProfile;
@@ -95,6 +101,9 @@ class YmrAladdinProvider extends ChangeNotifier {
       );
       final taxOps = await _service.fetchTaxOpportunities(snapshot);
       final cashFlow = await _service.fetchCashFlowProjection();
+      final research = await _service.fetchResearchInsights();
+      final playbooks = await _service.fetchStrategyPlaybooks(snapshot);
+      final platforms = await _service.fetchPlatformCapabilities();
 
       _snapshot = snapshot;
       _riskMetrics = risk;
@@ -109,6 +118,9 @@ class YmrAladdinProvider extends ChangeNotifier {
       _optimization = optimization;
       _taxOpportunities = taxOps;
       _cashFlowProjection = cashFlow;
+      _researchInsights = research;
+      _strategyPlaybooks = playbooks;
+      _platformCapabilities = platforms;
     } catch (error, stack) {
       debugPrint('Failed to initialize dashboard: $error\n$stack');
       _error = 'Unable to load data. Please check your connection and retry.';

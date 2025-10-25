@@ -9,11 +9,15 @@ class ForecastTab extends StatelessWidget {
     required this.forecasts,
     required this.tradeIdeas,
     this.precisionForecasts = const [],
+    this.researchInsights = const [],
+    this.strategyPlaybooks = const [],
   });
 
   final List<ForecastInsight> forecasts;
   final List<TradeIdea> tradeIdeas;
   final List<PrecisionForecast> precisionForecasts;
+  final List<ResearchInsight> researchInsights;
+  final List<StrategyPlaybook> strategyPlaybooks;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +70,36 @@ class ForecastTab extends StatelessWidget {
                   .toList(),
             ),
           ),
+          if (researchInsights.isNotEmpty)
+            SectionCard(
+              title: 'Deep Research Radar',
+              subtitle: 'Quant + AI diligence synthesised from multi-source intelligence',
+              child: Column(
+                children: researchInsights
+                    .map(
+                      (insight) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: _ResearchTile(insight: insight),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          if (strategyPlaybooks.isNotEmpty)
+            SectionCard(
+              title: 'Strategy Playbooks',
+              subtitle: 'Ready-to-execute asset allocation modules with quantified targets',
+              child: Column(
+                children: strategyPlaybooks
+                    .map(
+                      (playbook) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: _PlaybookTile(playbook: playbook),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
           SectionCard(
             title: 'Signal Coverage',
             subtitle: 'Cross-check model consensus and alternative data alignment',
@@ -344,6 +378,111 @@ class _TradeIdeaTile extends StatelessWidget {
                       avatar: const Icon(Icons.data_exploration, size: 16),
                       label: Text(evidence),
                     ))
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResearchTile extends StatelessWidget {
+  const _ResearchTile({required this.insight});
+
+  final ResearchInsight insight;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(insight.title, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(insight.summary, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: insight.supportingSources
+                .map(
+                  (source) => Chip(
+                    avatar: const Icon(Icons.analytics_outlined, size: 16),
+                    label: Text(source),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Chip(
+              avatar: const Icon(Icons.insights, size: 16),
+              label: Text('Confidence ${(insight.confidence * 100).toStringAsFixed(0)}%'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaybookTile extends StatelessWidget {
+  const _PlaybookTile({required this.playbook});
+
+  final StrategyPlaybook playbook;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(playbook.name, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(playbook.objective, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              Chip(
+                avatar: const Icon(Icons.trending_up, size: 16),
+                label: Text('Exp. return ${(playbook.expectedReturn * 100).toStringAsFixed(1)}%'),
+              ),
+              Chip(
+                avatar: const Icon(Icons.security_outlined, size: 16),
+                label: Text('Risk budget ${(playbook.riskBudget * 100).toStringAsFixed(1)}%'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: playbook.tactics
+                .map(
+                  (tactic) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.check, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(tactic)),
+                      ],
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ],

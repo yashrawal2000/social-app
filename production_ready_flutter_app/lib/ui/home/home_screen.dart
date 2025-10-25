@@ -99,12 +99,15 @@ class _HomeScreenState extends State<HomeScreen> {
           selectedRiskProfile: provider.selectedRiskProfile,
           optimization: provider.optimization,
           macroIndicators: provider.macroIndicators,
+          platformCapabilities: provider.platformCapabilities,
         );
       case 1:
         return ForecastTab(
           forecasts: provider.forecasts,
           tradeIdeas: provider.tradeIdeas,
           precisionForecasts: provider.precisionForecasts,
+          researchInsights: provider.researchInsights,
+          strategyPlaybooks: provider.strategyPlaybooks,
         );
       case 2:
         return AssistantTab(

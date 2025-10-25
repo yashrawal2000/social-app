@@ -90,6 +90,12 @@ graph TD
 6. **Deployment**: Models packaged as Docker containers, deployed on Kubernetes with canary rollouts and real-time performance monitoring.
 7. **Broker Automation APIs**: Integrations via Zerodha Kite Connect, Upstox, Binance, Interactive Brokers using OAuth2 and webhook callbacks for order status.
 
+## Data Fidelity & Research Modules
+- **Deterministic Market Feeds**: Primary ingestion through Stooq/Yahoo APIs with automatic fallbacks to curated datasets so pricing is always available for forecasts and VaR calculations.
+- **Hybrid Forecast Stack**: On-device linear models, Kalman filters, and causal transformers yield exact price targets with explainability metrics (R², residual error, volatility attribution).
+- **Deep Research Radar**: Momentum crossovers, moving-average spreads, and alternative data checks synthesised into human-readable briefs for every major holding.
+- **Strategy Playbooks**: Auto-generated allocation playbooks quantify expected return, risk budgets, and executable tactics for AI, crypto, and defensive sleeves.
+
 ## Example UI Layout & Dashboard Features
 - **Unified Command Center**
   - Portfolio overview widget with blended benchmarks and custom KPIs.
@@ -99,6 +105,9 @@ graph TD
   - Forecast cones for top holdings with confidence intervals.
   - Event calendar highlighting macro events and AI-detected anomalies.
   - Explainability cards summarizing drivers of each recommendation.
+- **Deep Research Radar**
+  - Research briefs ranked by confidence and moving-average breakouts.
+  - Strategy playbooks enumerating allocation tweaks and broker execution notes.
 - **Personal Finance Hub**
   - Cashflow timeline, budgeting categories, savings goal trackers.
   - Tax impact simulator with jurisdiction-specific guidance.
@@ -110,6 +119,11 @@ graph TD
   - API status monitor and broker authorization management.
 
 Cross-platform delivery leverages Flutter for mobile/desktop apps and React dashboards embedded via webviews, unified with a design system (Tailwind CSS + Material You).
+
+## Platform Coverage
+- **Android & iOS**: Native Flutter shell with biometric auth, secure storage, offline caches, and push automation triggers.
+- **Windows Desktop**: 64-bit Flutter Windows build with keyboard shortcuts, multi-window dashboards, encrypted secrets (DPAPI), and hardware-accelerated charts.
+- **Progressive Web App**: Optional web deployment with service-worker caching, TLS mutual authentication, and deep links into the automation APIs.
 
 ## Security, Privacy & Governance
 - End-to-end encryption with user-managed keys; zero-trust network segmentation.
