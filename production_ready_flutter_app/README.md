@@ -47,3 +47,34 @@ flutter build web --release
 ```
 
 > For Firebase/Sentry, follow their official setup to add platform files and enable Crashlytics/Analytics.
+
+## Running in VS Code
+
+1. **Install prerequisites**
+   - Install the [Flutter SDK](https://docs.flutter.dev/get-started/install) and ensure `flutter doctor` passes for your target platforms (Android, iOS, Windows, web).
+   - Install VS Code along with the official **Flutter** and **Dart** extensions.
+
+2. **Open the project**
+   - Launch VS Code and choose **File ▸ Open Folder…**, then select `production_ready_flutter_app/`.
+   - When prompted, click **Get Packages** or run `flutter pub get` in the built-in terminal.
+
+3. **Configure devices**
+   - For mobile: start an Android emulator or connect an iOS device/simulator.
+   - For Windows desktop: run `flutter config --enable-windows-desktop` and ensure you have the Windows build tools installed.
+   - For web: run `flutter config --enable-web`.
+
+4. **Run from VS Code**
+   - Press `F5` or use the **Run and Debug** panel, select the desired device from the status bar, and start debugging.
+   - The default launch configuration hot-reloads changes and streams logs into the Debug Console.
+
+5. **Common commands**
+   ```bash
+   flutter pub get          # fetch dependencies
+   flutter run -d windows   # Windows desktop build
+   flutter run -d chrome    # Web preview
+   flutter build apk        # Android release artifact
+   ```
+
+6. **Troubleshooting**
+   - Use **View ▸ Command Palette… ▸ Flutter: Run Flutter Doctor** for diagnostic output within VS Code.
+   - If the IDE does not detect a device, ensure the emulator/device is running and restart the Dart/Flutter extensions.

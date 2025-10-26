@@ -1,13 +1,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
 import 'core/bootstrap.dart';
 import 'core/theme.dart';
 import 'l10n/app_localizations.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'services/secure_storage_service.dart';
+import 'services/ymr_aladdin_service.dart';
 import 'ui/home/home_screen.dart';
-import 'ui/shared/locale_selector.dart';
+import 'ui/home/ymr_aladdin_provider.dart';
 
 const _localeKey = 'selected_locale';
 
@@ -39,10 +41,17 @@ class LocaleProvider extends ChangeNotifier {
 }
 
 void main() async {
-  await bootstrap(() => ChangeNotifierProvider(
-        create: (_) => LocaleProvider(),
-        child: const MyApp(),
-      ));
+  await bootstrap(
+    () => MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
+        ChangeNotifierProvider(
+          create: (_) => YmrAladdinProvider(YmrAladdinService()),
+        ),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
