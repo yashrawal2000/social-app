@@ -441,11 +441,13 @@ class IntradaySignal {
     required this.confidence,
     required this.accuracy7Day,
     required this.accuracy30Day,
+    required this.biasScore,
     required this.entryZone,
     required this.exitTarget,
     required this.stopLoss,
     required this.riskReward,
     required this.supportingIndicators,
+    required this.convictionDrivers,
     required this.strategyAlignment,
   });
 
@@ -456,11 +458,13 @@ class IntradaySignal {
   final double confidence;
   final double accuracy7Day;
   final double accuracy30Day;
+  final double biasScore;
   final String entryZone;
   final String exitTarget;
   final String stopLoss;
   final double riskReward;
   final List<String> supportingIndicators;
+  final List<String> convictionDrivers;
   final List<String> strategyAlignment;
 }
 

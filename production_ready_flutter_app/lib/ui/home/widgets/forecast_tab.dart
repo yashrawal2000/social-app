@@ -350,9 +350,21 @@ class _IntradaySignalTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+            Text(
+              'Directional edge ${(signal.biasScore * 100).toStringAsFixed(0)}% · '
+              '${signal.biasScore > 0 ? 'Bullish' : signal.biasScore < 0 ? 'Bearish' : 'Neutral'} stance',
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
             Text('Indicators', style: theme.textTheme.titleSmall),
             const SizedBox(height: 4),
             ...signal.supportingIndicators.map((indicator) => Text('• $indicator')),
+            if (signal.convictionDrivers.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Conviction drivers', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 4),
+              ...signal.convictionDrivers.map((driver) => Text('• $driver')),
+            ],
             const SizedBox(height: 8),
             Text('Aligned strategies', style: theme.textTheme.titleSmall),
             const SizedBox(height: 4),

@@ -315,39 +315,77 @@ class YmrAladdinService {
     final signals = <IntradaySignal>[];
     for (final asset in snapshot.assets.take(8)) {
       final series = _seriesCache[asset.symbol];
-      if (series == null || series.length < 15) continue;
+      if (series == null || series.length < 20) continue;
       final closes = series.map((point) => point.close).toList();
+      final volumes = series.map((point) => max(point.volume, 1)).toList();
       final shortEmaSeries = _emaSeries(closes, 9);
       final longEmaSeries = _emaSeries(closes, 21);
       final rsiSeries = _rsiSeries(closes, 14);
-      final latestClose = closes.last;
-      final shortEma = shortEmaSeries.last;
-      final longEma = longEmaSeries.last;
-      final rsi = rsiSeries.last;
+      final macdSeries = _macdSeries(closes);
+      final bollinger = _bollingerBands(closes, period: 20, stdDev: 2);
+      final adxSeries = _adxSeries(series, 14);
+      final vwapSeries = _vwapSeries(series, window: 20);
+      final obvSeries = _obvSeries(series);
+      final priceSlopeSeries = _normalizedSlopeSeries(closes, window: 8);
+      final vwapSlopeSeries = _normalizedSlopeSeries(vwapSeries, window: 8);
+      final obvSlopeSeries = _normalizedSlopeSeries(obvSeries, window: 12);
+      final volumeSlopeSeries = _normalizedSlopeSeries(volumes, window: 8);
+      final latestIndex = closes.length - 1;
+      final latestClose = closes[latestIndex];
       final atr = _averageTrueRange(series, 14);
-      final signalStrength = (shortEma - longEma).abs() / max(longEma.abs(), 1);
-      final baselineMove = atr / max(latestClose, 1);
-      final expectedMovePct = max(signalStrength * 0.65, baselineMove * 0.8).clamp(0.002, 0.08);
-      final directionalBias = _classifySignal(shortEma, longEma, rsi);
+
+      final composite = _evaluateComposite(
+        price: latestClose,
+        shortEma: shortEmaSeries[latestIndex],
+        longEma: longEmaSeries[latestIndex],
+        rsi: rsiSeries[latestIndex],
+        macdLine: macdSeries.line[latestIndex],
+        macdSignal: macdSeries.signal[latestIndex],
+        macdHist: macdSeries.histogram[latestIndex],
+        bollingerUpper: bollinger.upper[latestIndex],
+        bollingerLower: bollinger.lower[latestIndex],
+        bollingerBasis: bollinger.basis[latestIndex],
+        adx: adxSeries[latestIndex],
+        vwap: vwapSeries[latestIndex],
+        priceSlope: priceSlopeSeries[latestIndex],
+        vwapSlope: vwapSlopeSeries[latestIndex],
+        obvSlope: obvSlopeSeries[latestIndex],
+        volumeSlope: volumeSlopeSeries[latestIndex],
+        atr: atr,
+      );
+
+      final directionalBias = composite.bias > 0.1
+          ? 1
+          : composite.bias < -0.1
+              ? -1
+              : 0;
       final action = directionalBias > 0
           ? 'Buy'
           : directionalBias < 0
               ? (asset.assetClass == AssetClass.crypto ? 'Reduce / Hedge' : 'Sell')
               : 'Hold';
-      final strategyAlignment = <String>[
-        if (directionalBias > 0) 'Momentum breakout scalp',
-        if (directionalBias < 0) 'Momentum fade short',
-        if (rsi >= 45 && rsi <= 55) 'VWAP mean reversion',
-        if (baselineMove < 0.02) 'Volatility compression setup',
-      ];
-      if (strategyAlignment.isEmpty) {
-        strategyAlignment.add('Liquidity-weighted neutral watch');
-      }
+
+      final expectedMovePct = composite.expectedMovePct ??
+          (atr / max(latestClose, 1) * 0.6 + composite.signalStrength * 0.8)
+              .clamp(0.003, 0.1);
+
       final accuracy7 = _signalAccuracy(
         closes,
         shortEmaSeries,
         longEmaSeries,
         rsiSeries,
+        macdSeries.line,
+        macdSeries.signal,
+        macdSeries.histogram,
+        bollinger.upper,
+        bollinger.lower,
+        bollinger.basis,
+        adxSeries,
+        vwapSeries,
+        priceSlopeSeries,
+        vwapSlopeSeries,
+        obvSlopeSeries,
+        volumeSlopeSeries,
         lookback: 7,
       );
       final accuracy30 = _signalAccuracy(
@@ -355,13 +393,56 @@ class YmrAladdinService {
         shortEmaSeries,
         longEmaSeries,
         rsiSeries,
+        macdSeries.line,
+        macdSeries.signal,
+        macdSeries.histogram,
+        bollinger.upper,
+        bollinger.lower,
+        bollinger.basis,
+        adxSeries,
+        vwapSeries,
+        priceSlopeSeries,
+        vwapSlopeSeries,
+        obvSlopeSeries,
+        volumeSlopeSeries,
         lookback: 30,
       );
-      final confidence = (0.48 + signalStrength * 0.9 + (accuracy7 - 0.5) * 0.6)
-          .clamp(0.45, 0.96);
-      final entryOffset = atr * (directionalBias >= 0 ? -0.25 : 0.25);
-      final exitOffset = atr * (directionalBias >= 0 ? 0.9 : -0.9);
-      final stopOffset = atr * (directionalBias >= 0 ? -0.8 : 0.8);
+
+      final confidence = (0.5 +
+              composite.signalStrength * 0.4 +
+              composite.bias.abs() * 0.25 +
+              (accuracy7 - 0.5) * 0.6)
+          .clamp(0.46, 0.97);
+
+      final isBullish = directionalBias > 0;
+      final isBearish = directionalBias < 0;
+      final entryOffset = (isBullish || isBearish)
+          ? atr * (isBullish ? -0.22 : 0.22) * (1 - composite.bias.abs() * 0.25)
+          : 0.0;
+      final exitOffset = (isBullish || isBearish)
+          ? atr * (isBullish ? (0.85 + composite.bias.abs() * 0.4) : -(0.85 + composite.bias.abs() * 0.4))
+          : 0.0;
+      final stopOffset = (isBullish || isBearish)
+          ? atr *
+              (isBullish
+                  ? -(0.6 + (1 - composite.bias.abs()) * 0.25)
+                  : (0.6 + (1 - composite.bias.abs()) * 0.25))
+          : 0.0;
+
+      final neutralRange = max(atr * 0.35, latestClose * 0.004);
+      final entryLower = isBullish || isBearish ? latestClose + entryOffset : latestClose - neutralRange;
+      final entryUpper = isBullish || isBearish ? latestClose + entryOffset / 2 : latestClose + neutralRange;
+      final exitTargetValue = isBullish || isBearish ? latestClose + exitOffset : latestClose + neutralRange;
+      final stopLossValue = isBullish || isBearish ? latestClose + stopOffset : latestClose - neutralRange;
+      final riskReward = isBullish || isBearish
+          ? (exitOffset.abs() / max(stopOffset.abs(), 0.01)).clamp(0.5, 5.0)
+          : 1.0;
+
+      final bollPosition = ((latestClose - bollinger.basis[latestIndex]) /
+              max((bollinger.upper[latestIndex] - bollinger.basis[latestIndex]).abs(), 0.0001))
+          .clamp(-3, 3);
+      final vwapValue = vwapSeries[latestIndex];
+      final adxValue = adxSeries[latestIndex];
 
       signals.add(
         IntradaySignal(
@@ -372,17 +453,20 @@ class YmrAladdinService {
           confidence: confidence,
           accuracy7Day: accuracy7,
           accuracy30Day: accuracy30,
-          entryZone: '${(latestClose + entryOffset).toStringAsFixed(2)} - '
-              '${(latestClose + entryOffset / 2).toStringAsFixed(2)}',
-          exitTarget: (latestClose + exitOffset).toStringAsFixed(2),
-          stopLoss: (latestClose + stopOffset).toStringAsFixed(2),
-          riskReward: (exitOffset.abs() / max(stopOffset.abs(), 0.01)).clamp(0.4, 4.5),
+          biasScore: composite.bias,
+          entryZone: '${entryLower.toStringAsFixed(2)} - ${entryUpper.toStringAsFixed(2)}',
+          exitTarget: exitTargetValue.toStringAsFixed(2),
+          stopLoss: stopLossValue.toStringAsFixed(2),
+          riskReward: riskReward,
           supportingIndicators: [
-            '9EMA ${shortEma.toStringAsFixed(2)} vs 21EMA ${longEma.toStringAsFixed(2)}',
-            'RSI ${rsi.toStringAsFixed(1)}',
-            'ATR ${atr.toStringAsFixed(2)} (${(baselineMove * 100).toStringAsFixed(1)}% of price)',
+            '9EMA ${shortEmaSeries[latestIndex].toStringAsFixed(2)} vs 21EMA ${longEmaSeries[latestIndex].toStringAsFixed(2)}',
+            'RSI ${rsiSeries[latestIndex].toStringAsFixed(1)}',
+            'MACD ${macdSeries.line[latestIndex].toStringAsFixed(2)} · Signal ${macdSeries.signal[latestIndex].toStringAsFixed(2)}',
+            'VWAP ${vwapValue.toStringAsFixed(2)} (Δ ${(vwapSlopeSeries[latestIndex] * 100).toStringAsFixed(1)}%)',
+            'ADX ${adxValue.toStringAsFixed(1)} · Bollinger z ${(bollPosition * 100).toStringAsFixed(0)}%',
           ],
-          strategyAlignment: strategyAlignment,
+          convictionDrivers: composite.drivers,
+          strategyAlignment: composite.tags,
         ),
       );
     }
@@ -398,9 +482,22 @@ class YmrAladdinService {
     if (signals.isEmpty) {
       return const [];
     }
-    final breakoutSignals = signals.where((signal) => signal.strategyAlignment.contains('Momentum breakout scalp')).toList();
-    final fadeSignals = signals.where((signal) => signal.strategyAlignment.contains('Momentum fade short')).toList();
-    final meanReversionSignals = signals.where((signal) => signal.strategyAlignment.contains('VWAP mean reversion')).toList();
+    final breakoutLongSignals =
+        signals.where((signal) => signal.strategyAlignment.contains('Breakout momentum long')).toList();
+    final breakdownSignals =
+        signals.where((signal) => signal.strategyAlignment.contains('Breakdown momentum short')).toList();
+    final vwapContinuationSignals = signals
+        .where((signal) => signal.strategyAlignment.any((tag) => tag.contains('VWAP continuation')))
+        .toList();
+    final bollingerReversionSignals = signals
+        .where((signal) => signal.strategyAlignment.any((tag) => tag.contains('Bollinger snapback')))
+        .toList();
+    final rangeSignals = signals
+        .where((signal) => signal.strategyAlignment.any((tag) => tag.contains('Range scalping focus')))
+        .toList();
+    final volumeDriveSignals = signals
+        .where((signal) => signal.strategyAlignment.any((tag) => tag.contains('Volume expansion')))
+        .toList();
 
     double _avgAccuracy(List<IntradaySignal> list, double Function(IntradaySignal) extractor) {
       if (list.isEmpty) return 0.52;
@@ -411,6 +508,7 @@ class YmrAladdinService {
       required String name,
       required String focus,
       required List<IntradaySignal> base,
+      required List<String> bestFor,
     }) {
       final winRate = _avgAccuracy(base, (signal) => signal.accuracy30Day);
       final avgGain = base.isEmpty
@@ -429,30 +527,60 @@ class YmrAladdinService {
         averageGain: avgGain,
         maxDrawdown: maxDrawdown,
         sharpe: sharpe,
-        bestFor: [
-          if (name.contains('Breakout')) 'High momentum assets',
-          if (name.contains('Fade')) 'Choppy sessions & hedge overlays',
-          if (name.contains('Mean')) 'Range-bound equities or stablecoins',
-          'Execution via low-latency brokers',
-        ],
+        bestFor: bestFor,
       );
     }
 
     return [
       buildProfile(
-        name: 'Breakout Scalper',
-        focus: '9/21 EMA cross with RSI confirmation and ATR targets.',
-        base: breakoutSignals,
+        name: 'Breakout Momentum Long',
+        focus: 'High ADX breakouts with EMA/MACD alignment and VWAP trail management.',
+        base: breakoutLongSignals.isNotEmpty ? breakoutLongSignals : volumeDriveSignals,
+        bestFor: const [
+          'High momentum equities & crypto majors',
+          'Sessions with expanding volume & range',
+          'Traders deploying trailing stops & scale-outs',
+        ],
       ),
       buildProfile(
-        name: 'Fade & Hedge',
-        focus: 'Short-term exhaustion fades with disciplined stop framework.',
-        base: fadeSignals,
+        name: 'Breakdown Momentum Short',
+        focus: 'Bearish continuation with capitulation volume and ATR-protected downside targets.',
+        base: breakdownSignals,
+        bestFor: const [
+          'Portfolio hedges during macro stress',
+          'Short-biased scalpers seeking velocity',
+          'Automations with strict stop governance',
+        ],
       ),
       buildProfile(
-        name: 'Mean Reversion VWAP',
-        focus: 'Liquidity-weighted pullbacks towards VWAP bands.',
-        base: meanReversionSignals,
+        name: 'VWAP Continuation',
+        focus: 'Persistent trends riding positive VWAP slope with staged profit realisation.',
+        base: vwapContinuationSignals,
+        bestFor: const [
+          'Systematic intraday swing overlays',
+          'Assets reacting to institutional flow',
+          'Execution desks leaning on VWAP anchors',
+        ],
+      ),
+      buildProfile(
+        name: 'Bollinger Snapback',
+        focus: 'Extreme band deviations fading back towards liquidity-heavy midlines.',
+        base: bollingerReversionSignals,
+        bestFor: const [
+          'Range-bound symbols or stablecoins',
+          'Desk hedges after outsized moves',
+          'Options overlays hunting quick mean-reversions',
+        ],
+      ),
+      buildProfile(
+        name: 'Range Scalper',
+        focus: 'Low ADX consolidations harvesting liquidity pockets with tight risk.',
+        base: rangeSignals.isNotEmpty ? rangeSignals : bollingerReversionSignals,
+        bestFor: const [
+          'Market-neutral cash management',
+          'Algo overlays targeting micro-structure edges',
+          'Hours with muted volatility regimes',
+        ],
       ),
     ];
   }
@@ -1297,20 +1425,321 @@ class YmrAladdinService {
     return subset.reduce((a, b) => a + b) / subset.length;
   }
 
+  _MacdSeries _macdSeries(List<double> series, {int fast = 12, int slow = 26, int signal = 9}) {
+    if (series.isEmpty) {
+      return const _MacdSeries(line: [], signal: [], histogram: []);
+    }
+    final fastEma = _emaSeries(series, fast);
+    final slowEma = _emaSeries(series, slow);
+    final macdLine = <double>[];
+    for (var i = 0; i < series.length; i++) {
+      final fastValue = i < fastEma.length ? fastEma[i] : series[i];
+      final slowValue = i < slowEma.length ? slowEma[i] : series[i];
+      macdLine.add(fastValue - slowValue);
+    }
+    final signalLine = _emaSeries(macdLine, signal);
+    final histogram = <double>[];
+    for (var i = 0; i < macdLine.length; i++) {
+      final signalValue = i < signalLine.length ? signalLine[i] : 0;
+      histogram.add(macdLine[i] - signalValue);
+    }
+    return _MacdSeries(line: macdLine, signal: signalLine, histogram: histogram);
+  }
+
+  _BollingerBands _bollingerBands(
+    List<double> series, {
+    int period = 20,
+    double stdDev = 2,
+  }) {
+    if (series.isEmpty) {
+      return const _BollingerBands(upper: [], lower: [], basis: []);
+    }
+    final upper = <double>[];
+    final lower = <double>[];
+    final basis = <double>[];
+    for (var i = 0; i < series.length; i++) {
+      final start = max(0, i - period + 1);
+      final window = series.sublist(start, i + 1);
+      final mean = window.reduce((a, b) => a + b) / window.length;
+      final variance = window.fold<double>(0, (sum, value) => sum + pow(value - mean, 2)) / window.length;
+      final deviation = sqrt(max(variance, 0));
+      basis.add(mean);
+      upper.add(mean + deviation * stdDev);
+      lower.add(mean - deviation * stdDev);
+    }
+    return _BollingerBands(upper: upper, lower: lower, basis: basis);
+  }
+
+  List<double> _adxSeries(List<TimeSeriesPoint> series, int period) {
+    if (series.length < 2) {
+      return List<double>.filled(series.length, 15);
+    }
+    final adx = List<double>.filled(series.length, 15);
+    double prevHigh = series.first.high;
+    double prevLow = series.first.low;
+    double prevClose = series.first.close;
+    double smoothedTr = 0;
+    double smoothedPlus = 0;
+    double smoothedMinus = 0;
+    double adxValue = 15;
+    for (var i = 1; i < series.length; i++) {
+      final current = series[i];
+      final upMove = current.high - prevHigh;
+      final downMove = prevLow - current.low;
+      final trueRange = max(
+        current.high - current.low,
+        max((current.high - prevClose).abs(), (current.low - prevClose).abs()),
+      );
+      final plusDm = (upMove > downMove && upMove > 0) ? upMove : 0;
+      final minusDm = (downMove > upMove && downMove > 0) ? downMove : 0;
+      if (i <= period) {
+        smoothedTr += trueRange;
+        smoothedPlus += plusDm;
+        smoothedMinus += minusDm;
+      } else {
+        smoothedTr = smoothedTr - (smoothedTr / period) + trueRange;
+        smoothedPlus = smoothedPlus - (smoothedPlus / period) + plusDm;
+        smoothedMinus = smoothedMinus - (smoothedMinus / period) + minusDm;
+      }
+      final diPlus = smoothedTr == 0 ? 0 : (smoothedPlus / smoothedTr) * 100;
+      final diMinus = smoothedTr == 0 ? 0 : (smoothedMinus / smoothedTr) * 100;
+      final dx = (diPlus + diMinus) == 0 ? 0 : ((diPlus - diMinus).abs() / (diPlus + diMinus)) * 100;
+      if (i <= period) {
+        adxValue = ((adxValue * (i - 1)) + dx) / i;
+      } else {
+        adxValue = ((adxValue * (period - 1)) + dx) / period;
+      }
+      adx[i] = adxValue;
+      prevHigh = current.high;
+      prevLow = current.low;
+      prevClose = current.close;
+    }
+    return adx;
+  }
+
+  List<double> _vwapSeries(List<TimeSeriesPoint> series, {int window = 20}) {
+    if (series.isEmpty) {
+      return const [];
+    }
+    final vwap = <double>[];
+    final pvWindow = <double>[];
+    final volumeWindow = <double>[];
+    double sumPv = 0;
+    double sumVolume = 0;
+    for (final point in series) {
+      final typicalPrice = (point.high + point.low + point.close) / 3;
+      final volume = max(point.volume, 1);
+      final pv = typicalPrice * volume;
+      sumPv += pv;
+      sumVolume += volume;
+      pvWindow.add(pv);
+      volumeWindow.add(volume);
+      if (pvWindow.length > window) {
+        sumPv -= pvWindow.removeAt(0);
+        sumVolume -= volumeWindow.removeAt(0);
+      }
+      vwap.add(sumVolume == 0 ? typicalPrice : sumPv / sumVolume);
+    }
+    return vwap;
+  }
+
+  List<double> _obvSeries(List<TimeSeriesPoint> series) {
+    if (series.isEmpty) {
+      return const [];
+    }
+    final obv = <double>[];
+    double running = 0;
+    obv.add(running);
+    for (var i = 1; i < series.length; i++) {
+      final current = series[i];
+      final previous = series[i - 1];
+      if (current.close > previous.close) {
+        running += max(current.volume, 1);
+      } else if (current.close < previous.close) {
+        running -= max(current.volume, 1);
+      }
+      obv.add(running);
+    }
+    return obv;
+  }
+
+  List<double> _normalizedSlopeSeries(List<double> series, {required int window}) {
+    if (series.isEmpty) {
+      return const [];
+    }
+    final slopes = <double>[];
+    for (var i = 0; i < series.length; i++) {
+      final start = max(0, i - window + 1);
+      final segment = series.sublist(start, i + 1);
+      slopes.add(_normalizedSlopeValue(segment));
+    }
+    return slopes;
+  }
+
+  double _normalizedSlopeValue(List<double> segment) {
+    if (segment.length < 2) {
+      return 0;
+    }
+    final trend = _linearRegression(segment);
+    final scale = segment.last.abs() < 1 ? 1 : segment.last.abs();
+    return (trend.slope / scale) * segment.length;
+  }
+
+  _CompositeSignalOutcome _evaluateComposite({
+    required double price,
+    required double shortEma,
+    required double longEma,
+    required double rsi,
+    required double macdLine,
+    required double macdSignal,
+    required double macdHist,
+    required double bollingerUpper,
+    required double bollingerLower,
+    required double bollingerBasis,
+    required double adx,
+    required double vwap,
+    required double priceSlope,
+    required double vwapSlope,
+    required double obvSlope,
+    required double volumeSlope,
+    double? atr,
+  }) {
+    final votes = <_Vote>[];
+    final emaScore = (shortEma - longEma) / max(longEma.abs(), 1);
+    votes.add(_Vote(label: 'EMA momentum', score: emaScore.clamp(-1.5, 1.5), weight: 1.0));
+
+    final macdScore = macdHist / max(price * 0.002, 0.0001);
+    final macdSignalDiff = macdLine - macdSignal;
+    votes.add(
+      _Vote(
+        label: 'MACD impulse',
+        score: (macdScore + macdSignalDiff * 1.2).clamp(-1.5, 1.5),
+        weight: 0.95,
+      ),
+    );
+
+    final rsiScore = ((rsi - 50) / 25).clamp(-1.2, 1.2);
+    votes.add(_Vote(label: 'RSI balance', score: rsiScore, weight: 0.7));
+
+    final bandWidth = max((bollingerUpper - bollingerBasis).abs(), 0.0001);
+    final bollPosition = ((price - bollingerBasis) / bandWidth).clamp(-3, 3);
+    votes.add(_Vote(label: 'Bollinger posture', score: bollPosition * 0.6, weight: 0.65));
+
+    final vwapScore = ((price - vwap) / max(price * 0.003, 0.0001) + vwapSlope * 8).clamp(-1.4, 1.4);
+    votes.add(_Vote(label: 'VWAP alignment', score: vwapScore, weight: 0.9));
+
+    votes.add(_Vote(label: 'Trend slope', score: priceSlope.clamp(-1.2, 1.2), weight: 0.6));
+    votes.add(_Vote(label: 'OBV flow', score: obvSlope.clamp(-1.2, 1.2), weight: 0.55));
+    votes.add(_Vote(label: 'Volume impulse', score: volumeSlope.clamp(-1.2, 1.2), weight: 0.5));
+
+    final totalWeight = votes.fold<double>(0, (sum, vote) => sum + vote.weight);
+    final weightedScore = votes.fold<double>(0, (sum, vote) => sum + vote.score * vote.weight);
+    final trendIntensity = (adx / 25).clamp(0.4, 2.2);
+    final bias = (weightedScore / max(totalWeight, 0.0001)) * trendIntensity;
+    final clampedBias = bias.clamp(-1.0, 1.0);
+
+    final absSignal = votes.fold<double>(0, (sum, vote) => sum + vote.weight * vote.score.abs());
+    final signalStrength = (absSignal / max(totalWeight, 0.0001) * trendIntensity).clamp(0, 2.4);
+
+    final sortedVotes = [...votes]
+      ..sort((a, b) => (b.weight * b.score.abs()).compareTo(a.weight * a.score.abs()));
+    final convictionDrivers = sortedVotes.take(4).map((vote) {
+      final direction = vote.score >= 0 ? 'bullish' : 'bearish';
+      final magnitude = (vote.score.abs() * 100 * vote.weight).clamp(8, 95).toStringAsFixed(0);
+      return '${vote.label} $direction bias ($magnitude)';
+    }).toList();
+
+    final tags = <String>[];
+    if (clampedBias > 0.3 && trendIntensity > 0.9 && bollPosition > 0.3) {
+      tags.add('Breakout momentum long');
+    }
+    if (clampedBias < -0.3 && trendIntensity > 0.9 && bollPosition < -0.3) {
+      tags.add('Breakdown momentum short');
+    }
+    if (clampedBias.abs() < 0.2 && bollPosition.abs() > 0.8) {
+      tags.add('Bollinger snapback');
+    }
+    if (clampedBias > 0.15 && vwapSlope > 0.12) {
+      tags.add('VWAP continuation long');
+    }
+    if (clampedBias < -0.15 && vwapSlope < -0.12) {
+      tags.add('VWAP continuation short');
+    }
+    if (volumeSlope > 0.35 && clampedBias > 0.2) {
+      tags.add('Volume expansion long');
+    }
+    if (volumeSlope < -0.35 && clampedBias < -0.2) {
+      tags.add('Volume capitulation short');
+    }
+    if (trendIntensity < 0.75 && clampedBias.abs() < 0.25) {
+      tags.add('Range scalping focus');
+    }
+    if (tags.isEmpty) {
+      tags.add(clampedBias.abs() < 0.1 ? 'Neutral observation' : 'Discretionary follow-through');
+    }
+
+    final baselineVol = atr == null || price == 0 ? 0.005 : (atr / price).clamp(0.002, 0.09);
+    final expectedMovePct = atr == null
+        ? null
+        : (baselineVol * 0.55 + signalStrength * 0.35 + bollPosition.abs() * 0.04)
+            .clamp(0.002, 0.12);
+
+    return _CompositeSignalOutcome(
+      bias: clampedBias,
+      signalStrength: signalStrength,
+      trendIntensity: trendIntensity,
+      tags: tags,
+      drivers: convictionDrivers,
+      expectedMovePct: expectedMovePct,
+    );
+  }
+
   double _signalAccuracy(
     List<double> closes,
     List<double> shortEma,
     List<double> longEma,
     List<double> rsi,
-    {required int lookback},
-  ) {
-    if (closes.length < 3) return 0.52;
-    final start = max(0, closes.length - lookback - 1);
+    List<double> macdLine,
+    List<double> macdSignal,
+    List<double> macdHist,
+    List<double> bollingerUpper,
+    List<double> bollingerLower,
+    List<double> bollingerBasis,
+    List<double> adxSeries,
+    List<double> vwapSeries,
+    List<double> priceSlopeSeries,
+    List<double> vwapSlopeSeries,
+    List<double> obvSlopeSeries,
+    List<double> volumeSlopeSeries, {
+    required int lookback,
+  }) {
+    if (closes.length < 3) return 0.55;
+    final start = max(1, closes.length - lookback - 1);
     var correct = 0;
     var total = 0;
-    for (var i = max(start, longEma.length > 0 ? longEma.length - 1 : 0); i < closes.length - 1; i++) {
-      final direction = _classifySignal(shortEma[i], longEma[i], rsi[i]);
-      if (direction == 0) continue;
+    for (var i = start; i < closes.length - 1; i++) {
+      final outcome = _evaluateComposite(
+        price: closes[i],
+        shortEma: shortEma[i],
+        longEma: longEma[i],
+        rsi: rsi[i],
+        macdLine: macdLine[i],
+        macdSignal: macdSignal[i],
+        macdHist: macdHist[i],
+        bollingerUpper: bollingerUpper[i],
+        bollingerLower: bollingerLower[i],
+        bollingerBasis: bollingerBasis[i],
+        adx: adxSeries[i],
+        vwap: vwapSeries[i],
+        priceSlope: priceSlopeSeries[i],
+        vwapSlope: vwapSlopeSeries[i],
+        obvSlope: obvSlopeSeries[i],
+        volumeSlope: volumeSlopeSeries[i],
+      );
+      if (outcome.bias.abs() < 0.1) {
+        continue;
+      }
+      final direction = outcome.bias > 0 ? 1 : -1;
       final nextReturn = (closes[i + 1] - closes[i]) / max(closes[i], 1);
       if (direction > 0 && nextReturn > 0) {
         correct += 1;
@@ -1319,18 +1748,8 @@ class YmrAladdinService {
       }
       total += 1;
     }
-    if (total == 0) return 0.54;
-    return (correct / total).clamp(0.4, 0.95);
-  }
-
-  int _classifySignal(double shortEma, double longEma, double rsi) {
-    if (shortEma > longEma * 1.001 && rsi < 68) {
-      return 1;
-    }
-    if (shortEma < longEma * 0.999 && rsi > 32) {
-      return -1;
-    }
-    return 0;
+    if (total == 0) return 0.56;
+    return (correct / total).clamp(0.42, 0.97);
   }
 }
 
@@ -1339,4 +1758,46 @@ class _TrendResult {
 
   final double slope;
   final double intercept;
+}
+
+class _MacdSeries {
+  const _MacdSeries({required this.line, required this.signal, required this.histogram});
+
+  final List<double> line;
+  final List<double> signal;
+  final List<double> histogram;
+}
+
+class _BollingerBands {
+  const _BollingerBands({required this.upper, required this.lower, required this.basis});
+
+  final List<double> upper;
+  final List<double> lower;
+  final List<double> basis;
+}
+
+class _CompositeSignalOutcome {
+  const _CompositeSignalOutcome({
+    required this.bias,
+    required this.signalStrength,
+    required this.trendIntensity,
+    required this.tags,
+    required this.drivers,
+    this.expectedMovePct,
+  });
+
+  final double bias;
+  final double signalStrength;
+  final double trendIntensity;
+  final List<String> tags;
+  final List<String> drivers;
+  final double? expectedMovePct;
+}
+
+class _Vote {
+  const _Vote({required this.label, required this.score, required this.weight});
+
+  final String label;
+  final double score;
+  final double weight;
 }
