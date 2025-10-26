@@ -11,6 +11,8 @@ class ForecastTab extends StatelessWidget {
     this.precisionForecasts = const [],
     this.researchInsights = const [],
     this.strategyPlaybooks = const [],
+    this.intradaySignals = const [],
+    this.intradayStrategies = const [],
   });
 
   final List<ForecastInsight> forecasts;
@@ -18,6 +20,8 @@ class ForecastTab extends StatelessWidget {
   final List<PrecisionForecast> precisionForecasts;
   final List<ResearchInsight> researchInsights;
   final List<StrategyPlaybook> strategyPlaybooks;
+  final List<IntradaySignal> intradaySignals;
+  final List<IntradayStrategyProfile> intradayStrategies;
 
   @override
   Widget build(BuildContext context) {
@@ -67,9 +71,39 @@ class ForecastTab extends StatelessWidget {
                       child: _TradeIdeaTile(idea: idea),
                     ),
                   )
-                  .toList(),
+                .toList(),
             ),
           ),
+          if (intradaySignals.isNotEmpty)
+            SectionCard(
+              title: 'Intraday Trading Signals',
+              subtitle: 'Buy/Sell precision calls with back-tested accuracy and guardrails',
+              child: Column(
+                children: intradaySignals
+                    .map(
+                      (signal) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: _IntradaySignalTile(signal: signal),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          if (intradayStrategies.isNotEmpty)
+            SectionCard(
+              title: 'Intraday Strategy Accuracy',
+              subtitle: 'Edge analytics for scalping, fade, and range modules',
+              child: Column(
+                children: intradayStrategies
+                    .map(
+                      (profile) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: _IntradayStrategyRow(profile: profile),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
           if (researchInsights.isNotEmpty)
             SectionCard(
               title: 'Deep Research Radar',
@@ -245,6 +279,150 @@ class _ForecastRow extends StatelessWidget {
               Text('Horizon ${forecast.holdingPeriodDays} days', style: theme.textTheme.bodySmall),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IntradaySignalTile extends StatelessWidget {
+  const _IntradaySignalTile({required this.signal});
+
+  final IntradaySignal signal;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = signal.action == 'Buy'
+        ? Colors.green
+        : signal.action.contains('Sell')
+            ? Colors.red
+            : theme.colorScheme.secondary;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: color.withOpacity(0.16),
+                  foregroundColor: color,
+                  child: Text(signal.asset.symbol),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${signal.action} · ${signal.asset.name}', style: theme.textTheme.titleMedium),
+                      Text(
+                        'Expected move ${(signal.expectedMovePct * 100).toStringAsFixed(2)}% | '
+                        'Confidence ${(signal.confidence * 100).toStringAsFixed(0)}%',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('7D acc. ${(signal.accuracy7Day * 100).toStringAsFixed(0)}%'),
+                    Text('30D acc. ${(signal.accuracy30Day * 100).toStringAsFixed(0)}%'),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                _chip(theme, 'Entry ${signal.entryZone}'),
+                _chip(theme, 'Exit ${signal.exitTarget}'),
+                _chip(theme, 'Stop ${signal.stopLoss}'),
+                _chip(theme, 'R:R ${signal.riskReward.toStringAsFixed(2)}'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Indicators', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            ...signal.supportingIndicators.map((indicator) => Text('• $indicator')),
+            const SizedBox(height: 8),
+            Text('Aligned strategies', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: signal.strategyAlignment
+                  .map((strategy) => Chip(
+                        label: Text(strategy),
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        labelStyle: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chip(ThemeData theme, String label) {
+    return Chip(
+      label: Text(label),
+      backgroundColor: theme.colorScheme.surface,
+    );
+  }
+}
+
+class _IntradayStrategyRow extends StatelessWidget {
+  const _IntradayStrategyRow({required this.profile});
+
+  final IntradayStrategyProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(profile.name, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(profile.focus, style: theme.textTheme.bodySmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: profile.bestFor
+                    .map((item) => Chip(
+                          label: Text(item),
+                          backgroundColor: theme.colorScheme.surfaceVariant,
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text('Win rate ${(profile.winRate * 100).toStringAsFixed(0)}%'),
+            Text('Avg gain ${(profile.averageGain * 100).toStringAsFixed(1)}%'),
+            Text('Max DD ${(profile.maxDrawdown * 100).toStringAsFixed(1)}%'),
+            Text('Sharpe ${profile.sharpe.toStringAsFixed(2)}'),
+          ],
         ),
       ],
     );

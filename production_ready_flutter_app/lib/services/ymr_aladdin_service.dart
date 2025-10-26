@@ -311,6 +311,152 @@ class YmrAladdinService {
     return forecasts;
   }
 
+  Future<List<IntradaySignal>> fetchIntradaySignals(PortfolioSnapshot snapshot) async {
+    final signals = <IntradaySignal>[];
+    for (final asset in snapshot.assets.take(8)) {
+      final series = _seriesCache[asset.symbol];
+      if (series == null || series.length < 15) continue;
+      final closes = series.map((point) => point.close).toList();
+      final shortEmaSeries = _emaSeries(closes, 9);
+      final longEmaSeries = _emaSeries(closes, 21);
+      final rsiSeries = _rsiSeries(closes, 14);
+      final latestClose = closes.last;
+      final shortEma = shortEmaSeries.last;
+      final longEma = longEmaSeries.last;
+      final rsi = rsiSeries.last;
+      final atr = _averageTrueRange(series, 14);
+      final signalStrength = (shortEma - longEma).abs() / max(longEma.abs(), 1);
+      final baselineMove = atr / max(latestClose, 1);
+      final expectedMovePct = max(signalStrength * 0.65, baselineMove * 0.8).clamp(0.002, 0.08);
+      final directionalBias = _classifySignal(shortEma, longEma, rsi);
+      final action = directionalBias > 0
+          ? 'Buy'
+          : directionalBias < 0
+              ? (asset.assetClass == AssetClass.crypto ? 'Reduce / Hedge' : 'Sell')
+              : 'Hold';
+      final strategyAlignment = <String>[
+        if (directionalBias > 0) 'Momentum breakout scalp',
+        if (directionalBias < 0) 'Momentum fade short',
+        if (rsi >= 45 && rsi <= 55) 'VWAP mean reversion',
+        if (baselineMove < 0.02) 'Volatility compression setup',
+      ];
+      if (strategyAlignment.isEmpty) {
+        strategyAlignment.add('Liquidity-weighted neutral watch');
+      }
+      final accuracy7 = _signalAccuracy(
+        closes,
+        shortEmaSeries,
+        longEmaSeries,
+        rsiSeries,
+        lookback: 7,
+      );
+      final accuracy30 = _signalAccuracy(
+        closes,
+        shortEmaSeries,
+        longEmaSeries,
+        rsiSeries,
+        lookback: 30,
+      );
+      final confidence = (0.48 + signalStrength * 0.9 + (accuracy7 - 0.5) * 0.6)
+          .clamp(0.45, 0.96);
+      final entryOffset = atr * (directionalBias >= 0 ? -0.25 : 0.25);
+      final exitOffset = atr * (directionalBias >= 0 ? 0.9 : -0.9);
+      final stopOffset = atr * (directionalBias >= 0 ? -0.8 : 0.8);
+
+      signals.add(
+        IntradaySignal(
+          asset: asset,
+          action: action,
+          generatedAt: DateTime.now(),
+          expectedMovePct: expectedMovePct,
+          confidence: confidence,
+          accuracy7Day: accuracy7,
+          accuracy30Day: accuracy30,
+          entryZone: '${(latestClose + entryOffset).toStringAsFixed(2)} - '
+              '${(latestClose + entryOffset / 2).toStringAsFixed(2)}',
+          exitTarget: (latestClose + exitOffset).toStringAsFixed(2),
+          stopLoss: (latestClose + stopOffset).toStringAsFixed(2),
+          riskReward: (exitOffset.abs() / max(stopOffset.abs(), 0.01)).clamp(0.4, 4.5),
+          supportingIndicators: [
+            '9EMA ${shortEma.toStringAsFixed(2)} vs 21EMA ${longEma.toStringAsFixed(2)}',
+            'RSI ${rsi.toStringAsFixed(1)}',
+            'ATR ${atr.toStringAsFixed(2)} (${(baselineMove * 100).toStringAsFixed(1)}% of price)',
+          ],
+          strategyAlignment: strategyAlignment,
+        ),
+      );
+    }
+    signals.sort((a, b) => b.confidence.compareTo(a.confidence));
+    return signals;
+  }
+
+  Future<List<IntradayStrategyProfile>> fetchIntradayStrategyProfiles(
+    PortfolioSnapshot snapshot,
+    List<IntradaySignal>? intradaySignals,
+  ) async {
+    final signals = intradaySignals ?? await fetchIntradaySignals(snapshot);
+    if (signals.isEmpty) {
+      return const [];
+    }
+    final breakoutSignals = signals.where((signal) => signal.strategyAlignment.contains('Momentum breakout scalp')).toList();
+    final fadeSignals = signals.where((signal) => signal.strategyAlignment.contains('Momentum fade short')).toList();
+    final meanReversionSignals = signals.where((signal) => signal.strategyAlignment.contains('VWAP mean reversion')).toList();
+
+    double _avgAccuracy(List<IntradaySignal> list, double Function(IntradaySignal) extractor) {
+      if (list.isEmpty) return 0.52;
+      return list.fold<double>(0, (sum, signal) => sum + extractor(signal)) / list.length;
+    }
+
+    IntradayStrategyProfile buildProfile({
+      required String name,
+      required String focus,
+      required List<IntradaySignal> base,
+    }) {
+      final winRate = _avgAccuracy(base, (signal) => signal.accuracy30Day);
+      final avgGain = base.isEmpty
+          ? 0.004
+          : base.fold<double>(0, (sum, signal) => sum + signal.expectedMovePct) / base.length;
+      final maxDrawdown = base.isEmpty
+          ? -0.02
+          : -base.map((signal) => signal.expectedMovePct * 0.6).reduce(min);
+      final sharpe = base.isEmpty
+          ? 1.2
+          : (avgGain / max(0.0001, 0.015 - avgGain / 2)).clamp(0.8, 3.5);
+      return IntradayStrategyProfile(
+        name: name,
+        focus: focus,
+        winRate: winRate,
+        averageGain: avgGain,
+        maxDrawdown: maxDrawdown,
+        sharpe: sharpe,
+        bestFor: [
+          if (name.contains('Breakout')) 'High momentum assets',
+          if (name.contains('Fade')) 'Choppy sessions & hedge overlays',
+          if (name.contains('Mean')) 'Range-bound equities or stablecoins',
+          'Execution via low-latency brokers',
+        ],
+      );
+    }
+
+    return [
+      buildProfile(
+        name: 'Breakout Scalper',
+        focus: '9/21 EMA cross with RSI confirmation and ATR targets.',
+        base: breakoutSignals,
+      ),
+      buildProfile(
+        name: 'Fade & Hedge',
+        focus: 'Short-term exhaustion fades with disciplined stop framework.',
+        base: fadeSignals,
+      ),
+      buildProfile(
+        name: 'Mean Reversion VWAP',
+        focus: 'Liquidity-weighted pullbacks towards VWAP bands.',
+        base: meanReversionSignals,
+      ),
+    ];
+  }
+
   Future<List<SimulationScenario>> runSimulations(
     double targetReturn,
     RiskProfile profile,
@@ -1094,6 +1240,97 @@ class YmrAladdinService {
       drivers.add('Earnings revisions trending higher');
     }
     return drivers;
+  }
+
+  List<double> _emaSeries(List<double> series, int window) {
+    if (series.isEmpty) return const [];
+    final ema = <double>[];
+    final multiplier = 2 / (window + 1);
+    double? previous;
+    for (final value in series) {
+      previous = previous == null ? value : (value - previous) * multiplier + previous;
+      ema.add(previous);
+    }
+    return ema;
+  }
+
+  List<double> _rsiSeries(List<double> series, int period) {
+    if (series.length < 2) return List<double>.filled(series.length, 50);
+    final rsis = <double>[];
+    double gainAvg = 0;
+    double lossAvg = 0;
+    for (var i = 0; i < series.length; i++) {
+      if (i == 0) {
+        rsis.add(50);
+        continue;
+      }
+      final change = series[i] - series[i - 1];
+      final gain = change > 0 ? change : 0;
+      final loss = change < 0 ? -change : 0;
+      if (i <= period) {
+        gainAvg = (gainAvg * (i - 1) + gain) / max(i, 1);
+        lossAvg = (lossAvg * (i - 1) + loss) / max(i, 1);
+      } else {
+        gainAvg = (gainAvg * (period - 1) + gain) / period;
+        lossAvg = (lossAvg * (period - 1) + loss) / period;
+      }
+      final rs = lossAvg == 0 ? 100.0 : gainAvg / max(lossAvg, 0.0001);
+      final rsi = 100 - (100 / (1 + rs));
+      rsis.add(rsi.isNaN ? 50 : rsi);
+    }
+    return rsis;
+  }
+
+  double _averageTrueRange(List<TimeSeriesPoint> series, int period) {
+    if (series.length < 2) return 0.01;
+    final trs = <double>[];
+    for (var i = 1; i < series.length; i++) {
+      final current = series[i];
+      final previous = series[i - 1];
+      final range1 = current.high - current.low;
+      final range2 = (current.high - previous.close).abs();
+      final range3 = (current.low - previous.close).abs();
+      trs.add(max(range1, max(range2, range3)));
+    }
+    if (trs.isEmpty) return 0.01;
+    final subset = trs.sublist(max(0, trs.length - period));
+    return subset.reduce((a, b) => a + b) / subset.length;
+  }
+
+  double _signalAccuracy(
+    List<double> closes,
+    List<double> shortEma,
+    List<double> longEma,
+    List<double> rsi,
+    {required int lookback},
+  ) {
+    if (closes.length < 3) return 0.52;
+    final start = max(0, closes.length - lookback - 1);
+    var correct = 0;
+    var total = 0;
+    for (var i = max(start, longEma.length > 0 ? longEma.length - 1 : 0); i < closes.length - 1; i++) {
+      final direction = _classifySignal(shortEma[i], longEma[i], rsi[i]);
+      if (direction == 0) continue;
+      final nextReturn = (closes[i + 1] - closes[i]) / max(closes[i], 1);
+      if (direction > 0 && nextReturn > 0) {
+        correct += 1;
+      } else if (direction < 0 && nextReturn < 0) {
+        correct += 1;
+      }
+      total += 1;
+    }
+    if (total == 0) return 0.54;
+    return (correct / total).clamp(0.4, 0.95);
+  }
+
+  int _classifySignal(double shortEma, double longEma, double rsi) {
+    if (shortEma > longEma * 1.001 && rsi < 68) {
+      return 1;
+    }
+    if (shortEma < longEma * 0.999 && rsi > 32) {
+      return -1;
+    }
+    return 0;
   }
 }
 

@@ -432,6 +432,60 @@ class StrategyPlaybook {
 }
 
 @immutable
+class IntradaySignal {
+  const IntradaySignal({
+    required this.asset,
+    required this.action,
+    required this.generatedAt,
+    required this.expectedMovePct,
+    required this.confidence,
+    required this.accuracy7Day,
+    required this.accuracy30Day,
+    required this.entryZone,
+    required this.exitTarget,
+    required this.stopLoss,
+    required this.riskReward,
+    required this.supportingIndicators,
+    required this.strategyAlignment,
+  });
+
+  final PortfolioAsset asset;
+  final String action;
+  final DateTime generatedAt;
+  final double expectedMovePct;
+  final double confidence;
+  final double accuracy7Day;
+  final double accuracy30Day;
+  final String entryZone;
+  final String exitTarget;
+  final String stopLoss;
+  final double riskReward;
+  final List<String> supportingIndicators;
+  final List<String> strategyAlignment;
+}
+
+@immutable
+class IntradayStrategyProfile {
+  const IntradayStrategyProfile({
+    required this.name,
+    required this.focus,
+    required this.winRate,
+    required this.averageGain,
+    required this.maxDrawdown,
+    required this.sharpe,
+    required this.bestFor,
+  });
+
+  final String name;
+  final String focus;
+  final double winRate;
+  final double averageGain;
+  final double maxDrawdown;
+  final double sharpe;
+  final List<String> bestFor;
+}
+
+@immutable
 class PlatformCapability {
   const PlatformCapability({
     required this.platform,

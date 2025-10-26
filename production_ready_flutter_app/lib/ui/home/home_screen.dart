@@ -108,6 +108,8 @@ class _HomeScreenState extends State<HomeScreen> {
           precisionForecasts: provider.precisionForecasts,
           researchInsights: provider.researchInsights,
           strategyPlaybooks: provider.strategyPlaybooks,
+          intradaySignals: provider.intradaySignals,
+          intradayStrategies: provider.intradayStrategies,
         );
       case 2:
         return AssistantTab(

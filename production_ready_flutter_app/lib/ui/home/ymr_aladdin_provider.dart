@@ -23,6 +23,8 @@ class YmrAladdinProvider extends ChangeNotifier {
   List<MacroIndicator> _macroIndicators = const [];
   List<AutomationIntegration> _integrations = const [];
   List<TradeIdea> _tradeIdeas = const [];
+  List<IntradaySignal> _intradaySignals = const [];
+  List<IntradayStrategyProfile> _intradayStrategies = const [];
   PortfolioOptimization? _optimization;
   List<TaxOptimizationOpportunity> _taxOpportunities = const [];
   CashFlowProjection? _cashFlowProjection;
@@ -59,6 +61,8 @@ class YmrAladdinProvider extends ChangeNotifier {
   List<MacroIndicator> get macroIndicators => _macroIndicators;
   List<AutomationIntegration> get integrations => _integrations;
   List<TradeIdea> get tradeIdeas => _tradeIdeas;
+  List<IntradaySignal> get intradaySignals => _intradaySignals;
+  List<IntradayStrategyProfile> get intradayStrategies => _intradayStrategies;
   PortfolioOptimization? get optimization => _optimization;
   List<TaxOptimizationOpportunity> get taxOpportunities => _taxOpportunities;
   CashFlowProjection? get cashFlowProjection => _cashFlowProjection;
@@ -89,6 +93,8 @@ class YmrAladdinProvider extends ChangeNotifier {
       final macro = await _service.fetchMacroIndicators();
       final integrations = await _service.fetchIntegrations();
       final ideas = await _service.fetchTradeIdeas(snapshot);
+      final intraday = await _service.fetchIntradaySignals(snapshot);
+      final intradayProfiles = await _service.fetchIntradayStrategyProfiles(snapshot, intraday);
       final simulations = await _service.runSimulations(
         _targetReturn,
         _selectedRiskProfile,
@@ -114,6 +120,8 @@ class YmrAladdinProvider extends ChangeNotifier {
       _macroIndicators = macro;
       _integrations = integrations;
       _tradeIdeas = ideas;
+      _intradaySignals = intraday;
+      _intradayStrategies = intradayProfiles;
       _simulations = simulations;
       _optimization = optimization;
       _taxOpportunities = taxOps;

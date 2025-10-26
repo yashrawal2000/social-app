@@ -95,6 +95,7 @@ graph TD
 - **Hybrid Forecast Stack**: On-device linear models, Kalman filters, and causal transformers yield exact price targets with explainability metrics (R², residual error, volatility attribution).
 - **Deep Research Radar**: Momentum crossovers, moving-average spreads, and alternative data checks synthesised into human-readable briefs for every major holding.
 - **Strategy Playbooks**: Auto-generated allocation playbooks quantify expected return, risk budgets, and executable tactics for AI, crypto, and defensive sleeves.
+- **Intraday Trading Fabric**: Minute-level signal engine generates buy/sell instructions with ATR risk controls, EMA crossovers, RSI confirmation, and rolling win-rate telemetry for every liquid sleeve.
 
 ## Example UI Layout & Dashboard Features
 - **Unified Command Center**
@@ -105,6 +106,10 @@ graph TD
   - Forecast cones for top holdings with confidence intervals.
   - Event calendar highlighting macro events and AI-detected anomalies.
   - Explainability cards summarizing drivers of each recommendation.
+- **Intraday Trading Desk**
+  - Buy/sell precision tiles with entry, exit, stop, and risk/reward metrics.
+  - Strategy accuracy dashboard tracking breakout, fade, and VWAP mean-reversion modules.
+  - Real-time alignment with automation APIs for instant order routing.
 - **Deep Research Radar**
   - Research briefs ranked by confidence and moving-average breakouts.
   - Strategy playbooks enumerating allocation tweaks and broker execution notes.
